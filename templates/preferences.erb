@@ -2,6 +2,8 @@ Package: *
 Pin: release a=unstable
 Pin-Priority: 1
 
+<% if lsbdistrelease != "testing" -%>
 Package: *
 Pin: release a=testing
 Pin-Priority: 2
+<% end -%>
