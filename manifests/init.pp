@@ -2,6 +2,16 @@
 # Copyright (C) 2007 David Schmitt <david@schmitt.edv-bus.at>
 # See LICENSE for the full license granted to you.
 #
+# Include the apt class to get a default mirror, regular updates of the apt
+# cache, the backports gpg key, regular updates to the debian archive keys,
+# testing and unstable pinned to manual, and a configurable sources.list.
+#
+# Depend on File[apt_config] for a configured apt; on Exec[apt_updated] for
+# fresh apt caches;
+#
+# $custom_sources_list can be set to override the default sources
+#
+#
 # With hints from
 #  Micah Anderson <micah@riseup.net>
 #  * backports key
@@ -14,8 +24,10 @@ class apt {
 		default => $apt_clean,
 	}
 
+	module_dir { 'apt': }
+
 	package {
-		[apt, dselect]: ensure => installed,
+		[ 'apt', 'dselect' ]: ensure => installed,
 	}
 
 	# a few templates need lsbdistcodename
@@ -47,7 +59,6 @@ class apt {
 		"/etc/apt/preferences":
 			content => template("apt/preferences.erb"),
 			# use File[apt_config] to reference a completed configuration
-			# See "The Puppet Semaphor" 2007-06-25 on the puppet-users ML
 			alias => apt_config,
 			# only update together
 			require => File["/etc/apt/sources.list"];
@@ -57,8 +68,6 @@ class apt {
 			before => File[apt_config];
 	}
 
-	$apt_base_dir = "${module_dir_path}/apt"
-	module_dir { 'apt': }
 	# watch apt.conf.d
 	file { "/etc/apt/apt.conf.d": ensure => directory, checksum => mtime; }
 
@@ -83,27 +92,19 @@ class apt {
 			alias => apt_updated;
 	}
 
-	case $lsbdistcodename {
-		etch: {
-			## This package should really always be current
-			package {
-				[ "debian-archive-keyring", "debian-backports-keyring" ]:
-					ensure => latest,
-				}
+	## This package should really always be current
+	package {
+		[ "debian-archive-keyring", "debian-backports-keyring" ]:
+			ensure => latest,
+	}
 
-			# This key was downloaded from
-			# http://backports.org/debian/archive.key
-			# and is needed to bootstrap the backports trustpath
-			file { "${apt_base_dir}/backports.org.key":
-				source => "puppet://$servername/apt/backports.org.key",
-				mode => 0444, owner => root, group => root,
-			}
-			exec { "/usr/bin/apt-key add ${apt_base_dir}/backports.org.key && dselect update":
-				alias => "backports_key",
-				refreshonly => true,
-				subscribe => File["${apt_base_dir}/backports.org.key"],
-				before => [ File[apt_config], Package["debian-backports-keyring"] ]
-			}
-		}
+	# This key was downloaded from
+	# http://backports.org/debian/archive.key
+	# and is needed to bootstrap the backports trustpath
+	exec { "/usr/bin/apt-key add ${module_dir_path}/apt/backports.org.key && dselect update":
+		alias => "backports_key",
+		refreshonly => true,
+		subscribe => File["${module_dir_path}/apt"],
+		before => [ File[apt_config], Package["debian-backports-keyring"] ]
 	}
 }
